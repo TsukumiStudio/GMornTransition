@@ -65,10 +65,30 @@ await transition.reveal()
 | `shaders/fade.gdshader` | 一色で塗り潰す | `fill_color` |
 | `shaders/mosaic.gdshader` | 升目ごとに菱形が広がる | `primary_color` / `accent_color` / `grid_size` |
 | `shaders/wipe.gdshader` | 斜めの帯が横切る | `fill_color` / `angle` / `softness` |
+| `shaders/stripe.gdshader` | 帯が左右交互に滑り込み、開くときも同じ向きへ抜ける | `primary_color` / `accent_color` / `band_count` / `stagger` / `slant` |
 
 自作のシェーダでも、`progress`（0〜1）を受け取れば動く。名前を変えたいときは `progress_parameter` に入れる。
 
-### 5. 長さを変える
+**升目やひし形が育つ形は、途中で図形と図形の間が格子状に空く。**下の画面がその網目に透け続けるので、覆いとしては弱い。帯（`stripe`）は行を隙間なく敷き詰めるため、開いている場所は1行に多くて1つになる。
+
+覆うときと開くときで絵の作り方が変わるシェーダには、`exiting`（開いている最中か）が渡る。`progress` は開くとき 1 から 0 へ戻るだけなので、それだけでは向きを決められない。受け取らないシェーダでは何も起きない。
+
+### 5. 音も一緒に淡くする
+
+**切り替えには2種類ある。**曲ごと入れ替えるものと、同じ曲の続きのもの。前者は覆いに合わせて音も消さないと、覆い切って開いた先で前の曲が鳴り続け、どこかでぶつ切りに変わる。
+
+```gdscript
+transition.set_audio_player(bgm_player)          # 淡くする相手を渡す
+await transition.cover(transition.Audio.FADE)    # 覆いと同じ長さで曲も消える
+_play_bgm(next_track)                            # 差し替える側は restore_audio() を通す
+await transition.reveal(transition.Audio.FADE)   # 開きと同じ長さで上げ戻す
+```
+
+`Audio.KEEP`（既定）なら音は触らない。**開いた後で間を置いてから鳴らしたいとき**は、`reveal()` には `KEEP` を渡し、鳴らす時点で `fade_audio_in()` を呼ぶ。
+
+基準の音量は渡した時点の `volume_db` を覚える。音量のつまみで動いたら `set_audio_base_db()` で教え直す。曲を差し替える側は必ず `restore_audio()` を通す。淡く消したまま次の曲を鳴らすと、その曲が無音で流れ続ける。
+
+### 6. 長さを変える
 
 | 項目 | 何を決めるか | 既定 |
 | --- | --- | --- |
@@ -81,9 +101,13 @@ await transition.reveal()
 
 | 呼び出し | 何をするか |
 | --- | --- |
-| `cover()` | 覆い切るまで待つ |
-| `reveal()` | 開き切るまで待ち、隠れる |
+| `cover(audio)` | 覆い切るまで待つ。`Audio.FADE` で音も消す |
+| `reveal(audio)` | 開き切るまで待ち、隠れる。`Audio.FADE` で音も上げ戻す |
 | `set_progress(value)` | 覆っている度合いを直に指す |
+| `set_audio_player(player, base_db)` | 淡くする相手と、戻す先の音量を渡す |
+| `set_audio_base_db(db)` | 戻す先の音量を教え直す |
+| `fade_audio_out(duration)` / `fade_audio_in(duration)` | 音だけを淡くする |
+| `restore_audio()` | 音量を基準へ即座に戻す |
 | `animations_disabled()` | 途中を飛ばすかどうか |
 | `surface` | 覆いに使っている `ColorRect` |
 | `transition_material` | 複製した後の `ShaderMaterial` |

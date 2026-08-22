@@ -19,6 +19,10 @@ extends CanvasLayer
 ## 画面のない実行と、長さを0にしたときは、途中を飛ばして終端の値へ移る。
 ## 見えないものを待つと、検証がその分だけ遅くなる。
 ##
+## **切り替えには2種類ある。**曲ごと入れ替えるものと、同じ曲の続きのもの。
+## 前者は覆いに合わせて音も淡くしないと、覆い切って開いた先で前の曲が鳴り続け、
+## どこかでぶつ切りに変わる。呼ぶ側が `Audio.FADE` を渡して選ぶ。
+##
 ## 使い方は README.md を参照。
 
 ## 覆うのにかける長さ（秒）。
@@ -31,11 +35,33 @@ extends CanvasLayer
 @export var transition_shader: Shader
 ## シェーダへ渡す数の名前。既定の `progress` から変えたいときに使う。
 @export var progress_parameter := "progress"
+## 「開いている最中か」を渡す名前。受け取らないシェーダでは何も起きない。
+##
+## 覆うときと開くときで絵の作り方が変わるものがある（帯は開くときも同じ向きへ
+## 抜ける）。`progress` は開くとき 1 から 0 へ戻るだけなので、それだけでは向きを
+## 決められない。覆う前に `false`、開く前に `true` をここへ書く。
+@export var exiting_parameter := "exiting"
+
+## 覆いに合わせて音をどう扱うか。
+enum Audio {
+	## 触らない。同じ曲の続きで場面だけ変わるとき。
+	KEEP,
+	## 覆いと同じ長さで淡くする。曲ごと入れ替えるとき。
+	FADE,
+}
+
+## 淡く消し切ったときの音量（dB）。
+@export var audio_silent_db := -60.0
 
 ## 覆いに使う `ColorRect`。`.tscn` に置いていなければ自分で作る。
 var surface: ColorRect
 var transition_material: ShaderMaterial
 var active_tween: Tween
+## 淡くする相手。呼ぶ側が `set_audio_player()` で渡す。
+var audio_player: AudioStreamPlayer
+## 淡くする前の音量（dB）。戻すときの行き先になる。
+var audio_base_db := 0.0
+var audio_tween: Tween
 
 func _ready() -> void:
 	surface = _find_surface()
@@ -46,9 +72,15 @@ func _ready() -> void:
 	visible = false
 
 ## 覆い切るまで待つ。切り替えの前に呼ぶ。
-func cover() -> void:
+##
+## `Audio.FADE` を渡すと、覆いと同じ長さで音も消える。曲ごと入れ替える切り替えで
+## 使う。渡さなければ音は触らない。
+func cover(audio := Audio.KEEP) -> void:
 	visible = true
+	_set_exiting(false)
 	set_progress(0.0)
+	if audio == Audio.FADE:
+		fade_audio_out(cover_duration)
 	if animations_disabled():
 		set_progress(1.0)
 		return
@@ -58,14 +90,62 @@ func cover() -> void:
 ##
 ## 隠すのは、覆いが `mouse_filter` で入力を受け取るためである。開いたまま
 ## 残しておくと、透明なのに押せない場所ができる。
-func reveal() -> void:
+func reveal(audio := Audio.KEEP) -> void:
+	_set_exiting(true)
 	set_progress(1.0)
+	if audio == Audio.FADE:
+		fade_audio_in(reveal_duration)
 	if animations_disabled():
 		set_progress(0.0)
 		visible = false
 		return
 	await _animate_progress(1.0, 0.0, reveal_duration, Tween.EASE_OUT)
 	visible = false
+
+## 淡くする相手を渡す。`base_db` を省くと、渡した時点の音量を基準にする。
+##
+## 基準は呼ぶ側の設定（音量のつまみ）で動くので、変わったら渡し直す。
+func set_audio_player(player: AudioStreamPlayer, base_db := INF) -> void:
+	audio_player = player
+	set_audio_base_db(base_db if base_db < INF else (player.volume_db if player != null else 0.0))
+
+## 淡くする前の音量を教え直す。
+func set_audio_base_db(base_db: float) -> void:
+	audio_base_db = base_db
+
+## 音を淡く消す。
+func fade_audio_out(duration: float) -> void:
+	_fade_audio(audio_silent_db, duration)
+
+## 音を淡く上げ戻す。**待ちを挟んでから上げたいときは、呼ぶ側がここを呼ぶ。**
+func fade_audio_in(duration: float) -> void:
+	_fade_audio(audio_base_db, duration)
+
+## 音量を基準へ即座に戻す。
+##
+## **曲を差し替える側は必ずこれを通す。**淡く消したまま次の曲を鳴らすと、その曲が
+## 無音で流れ続ける。切り替えを途中でやめた道でも戻し忘れが残らない。
+func restore_audio() -> void:
+	_fade_audio(audio_base_db, 0.0)
+
+func _fade_audio(to_db: float, duration: float) -> void:
+	if audio_player == null or not is_instance_valid(audio_player):
+		return
+	# 前の淡くしが残っていたら止める。重ねると音量が行ったり来たりする。
+	if audio_tween and audio_tween.is_valid():
+		audio_tween.kill()
+	if duration <= 0.0 or animations_disabled():
+		audio_player.volume_db = to_db
+		return
+	audio_tween = create_tween()
+	# 切り替えの最中に木を止めることがある。止まっても淡くしは進めたい。
+	audio_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	audio_tween.tween_property(audio_player, "volume_db", to_db, duration)
+
+func _set_exiting(value: bool) -> void:
+	if transition_material == null:
+		return
+	transition_material.set_shader_parameter(exiting_parameter, value)
 
 ## いま覆っている度合い。0で何も無い、1で覆い切っている。
 func set_progress(value: float) -> void:

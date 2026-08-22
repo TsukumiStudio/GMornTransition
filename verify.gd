@@ -24,6 +24,36 @@ func _run() -> void:
 	assert(not transition.visible, "はじめから覆っている")
 	assert(transition.animations_disabled(), "画面が無いのに途中を待とうとしている")
 
+	# 音を淡くする口。窓なしでは途中を飛ばすので、終端の値だけを見る。
+	var player := AudioStreamPlayer.new()
+	player.volume_db = -6.0
+	root.add_child(player)
+	transition.set_audio_player(player)
+	assert(is_equal_approx(transition.audio_base_db, -6.0),
+		"渡した時点の音量を覚えていない（%.1f）" % transition.audio_base_db)
+	transition.fade_audio_out(0.0)
+	assert(is_equal_approx(player.volume_db, transition.audio_silent_db),
+		"淡く消しても %.1fdB のまま" % player.volume_db)
+	transition.restore_audio()
+	assert(is_equal_approx(player.volume_db, -6.0),
+		"戻しても %.1fdB のまま。淡く消したまま次の曲が無音で流れる" % player.volume_db)
+
+	# 音を触らない側（既定）では、音量が動かないこと。
+	player.volume_db = -6.0
+	await transition.cover()
+	assert(is_equal_approx(player.volume_db, -6.0),
+		"`Audio.KEEP` なのに音量が %.1fdB へ動いた" % player.volume_db)
+	await transition.reveal()
+
+	# 覆いに合わせて音も消える。
+	await transition.cover(transition.Audio.FADE)
+	assert(is_equal_approx(player.volume_db, transition.audio_silent_db),
+		"`Audio.FADE` でも音量が %.1fdB のまま" % player.volume_db)
+	await transition.reveal(transition.Audio.FADE)
+	assert(is_equal_approx(player.volume_db, -6.0),
+		"開き切っても音量が %.1fdB のまま" % player.volume_db)
+	player.queue_free()
+
 	# 覆うと、覆い切った値まで進んで見えている。
 	await transition.cover()
 	assert(transition.visible, "覆ったのに見えていない")
