@@ -29,6 +29,12 @@ extends CanvasLayer
 @export_range(0.0, 3.0, 0.05) var cover_duration := 0.55
 ## 開くのにかける長さ（秒）。開くほうを長くすると、次の場面が現れる間が取れる。
 @export_range(0.0, 3.0, 0.05) var reveal_duration := 0.75
+## 覆い切ってから `cover()` が返るまで、覆ったまま置く長さ（秒）。
+##
+## 場面の入れ替えは覆い切った直後に走るため、ここが0だと切り替えた先が
+## すぐ明け始める。使う側が各自でタイマーを足すと、間が場面ごとにばらける。
+## **切り替えの間はここ1つで決める。**
+@export_range(0.0, 5.0, 0.05) var hold_duration := 0.0
 ## 覆いに使うシェーダ。`progress` を受け取るものであれば何でもよい。
 ##
 ## 覆いの `ColorRect` を自分で置いてある場合は、そちらの材質が優先される。
@@ -75,6 +81,9 @@ func _ready() -> void:
 ##
 ## `Audio.FADE` を渡すと、覆いと同じ長さで音も消える。曲ごと入れ替える切り替えで
 ## 使う。渡さなければ音は触らない。
+##
+## `hold_duration` を入れてあれば、覆い切ったあとその分だけ待ってから返る。
+## 途中を飛ばすときは保つ間も飛ばす。見えないものを待つと検証が遅くなる。
 func cover(audio := Audio.KEEP) -> void:
 	visible = true
 	_set_exiting(false)
@@ -85,6 +94,15 @@ func cover(audio := Audio.KEEP) -> void:
 		set_progress(1.0)
 		return
 	await _animate_progress(0.0, 1.0, cover_duration, Tween.EASE_IN)
+	await _hold()
+
+## 覆ったまま置く。既定のまま作れば木が止まっていても進み、時間の倍率には従う。
+## 覆いの進み方（`TWEEN_PAUSE_PROCESS`）と揃えておかないと、遅回しにしたときだけ
+## 保つ間が置いていかれる。
+func _hold() -> void:
+	if hold_duration <= 0.0:
+		return
+	await get_tree().create_timer(hold_duration).timeout
 
 ## 開き切るまで待つ。切り替えた後に呼ぶ。開き切ったら自分を隠す。
 ##

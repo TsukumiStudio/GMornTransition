@@ -87,6 +87,15 @@ func _run() -> void:
 	placed.reveal_duration = 0.0
 	assert(placed.animations_disabled(), "長さ0でも待とうとしている")
 
+	# 覆ったまま置く間は、途中を飛ばすときには待たない。画面のない検証で
+	# 場面の数だけ待たされると、そのぶん丸ごと遅くなる。
+	transition.hold_duration = 30.0
+	var before := Time.get_ticks_msec()
+	await transition.cover()
+	assert(Time.get_ticks_msec() - before < 1000,
+		"画面が無いのに覆ったまま待っている: %dms" % (Time.get_ticks_msec() - before))
+	await transition.reveal()
+
 	print("覆い=%s 材質=複製" % placed.surface.name)
 	print("GMORN TRANSITION VERIFY: PASS")
 	quit(0)

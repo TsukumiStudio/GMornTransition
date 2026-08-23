@@ -94,14 +94,17 @@ await transition.reveal(transition.Audio.FADE)   # 開きと同じ長さで上�
 | --- | --- | --- |
 | `cover_duration` | 覆うのにかける秒数 | `0.55` |
 | `reveal_duration` | 開くのにかける秒数 | `0.75` |
+| `hold_duration` | 覆い切ってから `cover()` が返るまで、覆ったまま置く秒数 | `0.0` |
 
-開くほうを長くすると、次の場面が現れる間が取れる。両方を0にすると途中を飛ばす。検証を速くしたいときに使える。
+開くほうを長くすると、次の場面が現れる間が取れる。`cover_duration` と `reveal_duration` の両方を0にすると途中を飛ばす。検証を速くしたいときに使える。
+
+場面の入れ替えは覆い切った直後に走るので、`hold_duration` が0だと切り替えた先がすぐ明け始める。**切り替えの間はここで決める。**使う側が呼び出しごとにタイマーを足すと、足した場所と足し忘れた場所で間がばらける。途中を飛ばすときは保つ間も飛ばす。
 
 ### その他の口
 
 | 呼び出し | 何をするか |
 | --- | --- |
-| `cover(audio)` | 覆い切るまで待つ。`Audio.FADE` で音も消す |
+| `cover(audio)` | 覆い切るまで待ち、`hold_duration` だけ覆ったまま置く。`Audio.FADE` で音も消す |
 | `reveal(audio)` | 開き切るまで待ち、隠れる。`Audio.FADE` で音も上げ戻す |
 | `set_progress(value)` | 覆っている度合いを直に指す |
 | `set_audio_player(player, base_db)` | 淡くする相手と、戻す先の音量を渡す |
