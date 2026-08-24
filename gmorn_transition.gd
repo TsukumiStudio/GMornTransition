@@ -93,7 +93,9 @@ func cover(audio := Audio.KEEP) -> void:
 	if animations_disabled():
 		set_progress(1.0)
 		return
-	await _animate_progress(0.0, 1.0, cover_duration, Tween.EASE_IN)
+	# 序盤を溜めると低い progress が続き、段階表示では開始が止まって見える。
+	# 線形に進め、呼んだ直後から終端まで同じ速度で覆う。
+	await _animate_progress(0.0, 1.0, cover_duration, Tween.EASE_IN, Tween.TRANS_LINEAR)
 	await _hold()
 
 ## 覆ったまま置く。既定のまま作れば木が止まっていても進み、時間の倍率には従う。
@@ -176,7 +178,8 @@ func animations_disabled() -> bool:
 	return DisplayServer.get_name() == "headless" \
 		or is_zero_approx(cover_duration + reveal_duration)
 
-func _animate_progress(from: float, to: float, duration: float, ease: Tween.EaseType) -> void:
+func _animate_progress(from: float, to: float, duration: float, ease: Tween.EaseType,
+		trans: Tween.TransitionType = Tween.TRANS_CUBIC) -> void:
 	# 前の切り替えが残っていたら止める。重ねると数が行ったり来たりする。
 	if active_tween and active_tween.is_valid():
 		active_tween.kill()
@@ -184,7 +187,7 @@ func _animate_progress(from: float, to: float, duration: float, ease: Tween.Ease
 	# 切り替えの最中に木を止めることがある。止まっても覆いは進めたい。
 	active_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	active_tween.tween_method(set_progress, from, to, duration) \
-		.set_trans(Tween.TRANS_CUBIC).set_ease(ease)
+		.set_trans(trans).set_ease(ease)
 	await active_tween.finished
 
 ## 覆いを探す。`%Surface` か、最初に見つかった `ColorRect` を使う。
