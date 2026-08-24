@@ -15,6 +15,7 @@ trap 'rm -rf "$work_dir"' EXIT
 
 mkdir -p "$work_dir/addons/gmorn_transition/shaders"
 cp "$addon_dir"/*.gd "$addon_dir"/plugin.cfg "$work_dir/addons/gmorn_transition/"
+cp -R "$addon_dir"/parts "$work_dir/addons/gmorn_transition/parts"
 cp "$addon_dir"/shaders/*.gdshader "$work_dir/addons/gmorn_transition/shaders/"
 cp "$addon_dir/verify.gd" "$work_dir/verify.gd"
 
