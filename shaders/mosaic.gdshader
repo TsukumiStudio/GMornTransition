@@ -1,8 +1,6 @@
 shader_type canvas_item;
 
-// 升目ごとに菱形が広がって画面を埋めていく切り替え。
-//
-// 升目の位置で始まりをずらす（`wave`）ため、左上から右下へ流れるように見える。
+// 升目ごとに菱形が広がる切り替え。始まりを升目の位置でずらす（`wave`）。
 // 一斉に広げると、ただ画面が明るくなるだけで動きが読めない。
 
 uniform float progress : hint_range(0.0, 1.0) = 0.0;
@@ -20,7 +18,7 @@ void fragment() {
 	float diamond_distance = abs(cell.x) + abs(cell.y);
 	float diamond_size = cell_progress * 1.08;
 	float mask_alpha = 1.0 - smoothstep(diamond_size - 0.035, diamond_size + 0.035, diamond_distance);
-	// 縁だけ色を変える。境目が見えないと、広がっている最中だと分からない。
+	// 縁の色を変えないと、広がっている最中だと分からない。
 	float highlight = 1.0 - smoothstep(diamond_size - 0.16, diamond_size - 0.05, diamond_distance);
 	vec3 color = mix(accent_color.rgb, primary_color.rgb, highlight);
 	COLOR = vec4(color, mask_alpha);

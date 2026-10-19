@@ -1,11 +1,9 @@
 #!/bin/sh
-# この部品だけを確かめる。
+# この部品だけをヘッドレスで確かめる。
 #
-# リポジトリ直下に project.godot は置けない。取り込む側が
-# addons/gmorn_transition へ submodule として入れるため、そこに project.godot が
-# あるとGodotが「別のプロジェクト」と見なしてフォルダごと書き出しから外す。
-#
-# 代わりに、一時の置き場へ最小のプロジェクトを作って、その中へこの部品を写して回す。
+# リポジトリ直下に project.godot は置けない。submodule として取り込まれた先に
+# project.godot があると、Godot がそこを別プロジェクトと見なして書き出しから外す。
+# 代わりに一時の最小プロジェクトへ写して回す。
 set -eu
 
 addon_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -28,6 +26,6 @@ config/name="GMornTransition Verify"
 config/features=PackedStringArray("4.7")
 PROJECT
 
-# シェーダは一度取り込ませないと `load()` で引けない。取り込みだけ先に回す。
+# シェーダは一度取り込ませないと `load()` で引けない。
 "$godot_bin" --headless --path "$work_dir" --import >/dev/null 2>&1 || true
 "$godot_bin" --headless --path "$work_dir" --script verify.gd

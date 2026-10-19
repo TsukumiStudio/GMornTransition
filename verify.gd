@@ -1,9 +1,6 @@
 extends SceneTree
 
-## 覆いの用意と、覆う・開くの終わり方を確かめる。
-##
-## 画面のない実行なので途中は飛ぶ。飛んだときも終端の値へ必ず移ること、
-## 開き終えたら隠れることを見る。ここが崩れると、透明なのに押せない場所が残る。
+## 覆いの用意と、途中を飛ばしても終端の値へ移り開き終えたら隠れることを保証する。
 
 const TRANSITION_PATH := "res://addons/gmorn_transition/gmorn_transition.gd"
 const SHADER_PATH := "res://addons/gmorn_transition/shaders/fade.gdshader"
@@ -14,7 +11,7 @@ func _initialize() -> void:
 func _run() -> void:
 	var script: GDScript = load(TRANSITION_PATH)
 
-	# 台本を付けるだけで覆いができる。`.tscn` を用意しなくてよい。
+	# 台本を付けるだけで覆いができる。
 	var transition: CanvasLayer = script.new()
 	transition.transition_shader = load(SHADER_PATH)
 	root.add_child(transition)
@@ -24,7 +21,7 @@ func _run() -> void:
 	assert(not transition.visible, "はじめから覆っている")
 	assert(transition.animations_disabled(), "画面が無いのに途中を待とうとしている")
 
-	# 音を淡くする口。窓なしでは途中を飛ばすので、終端の値だけを見る。
+	# 音の淡くし。終端の値だけを見る。
 	var player := AudioStreamPlayer.new()
 	player.volume_db = -6.0
 	root.add_child(player)
@@ -38,7 +35,7 @@ func _run() -> void:
 	assert(is_equal_approx(player.volume_db, -6.0),
 		"戻しても %.1fdB のまま。淡く消したまま次の曲が無音で流れる" % player.volume_db)
 
-	# 音を触らない側（既定）では、音量が動かないこと。
+	# 既定（KEEP）では音量が動かない。
 	player.volume_db = -6.0
 	await transition.cover()
 	assert(is_equal_approx(player.volume_db, -6.0),
@@ -60,14 +57,13 @@ func _run() -> void:
 	assert(is_equal_approx(_progress(transition), 1.0),
 		"覆い切っていない: %f" % _progress(transition))
 
-	# 開くと、元へ戻って隠れる。隠さないと、透明なのに押せない場所が残る。
+	# 開くと、元へ戻って隠れる。
 	await transition.reveal()
 	assert(not transition.visible, "開いたのに隠れていない")
 	assert(is_equal_approx(_progress(transition), 0.0),
 		"開き切っていない: %f" % _progress(transition))
 
-	# 置いてある材質は複製して使う。元を書き換えると、同じシェーダを使う
-	# 他の場所まで一緒に動く。
+	# 置いてある材質は複製して使い、元を書き換えない。
 	var shared := ShaderMaterial.new()
 	shared.shader = load(SHADER_PATH)
 	var placed: CanvasLayer = script.new()
@@ -87,8 +83,7 @@ func _run() -> void:
 	placed.reveal_duration = 0.0
 	assert(placed.animations_disabled(), "長さ0でも待とうとしている")
 
-	# 覆ったまま置く間は、途中を飛ばすときには待たない。画面のない検証で
-	# 場面の数だけ待たされると、そのぶん丸ごと遅くなる。
+	# 途中を飛ばすときは hold_duration も待たない。
 	transition.hold_duration = 30.0
 	var before := Time.get_ticks_msec()
 	await transition.cover()
